@@ -1,0 +1,675 @@
+{
+  "info": {
+    "name": "Acquired API",
+    "description": "Internal proxy API for Acquired.com payment gateway",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Customers",
+      "item": [
+        {
+          "name": "Create Customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reference\": \"CUST-{{$randomInt}}\",\n  \"first_name\": \"John\",\n  \"last_name\": \"Doe\",\n  \"billing\": {\n    \"email\": \"john.doe@example.com\",\n    \"address\": {\n      \"line_1\": \"1 High Street\",\n      \"city\": \"London\",\n      \"postcode\": \"SW1A 1AA\",\n      \"country_code\": \"GB\"\n    }\n  }\n}"
+            },
+            "url": "{{base_url}}/api/customers"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  var json = pm.response.json();",
+                  "  pm.environment.set('customer_id', json.customer_id);",
+                  "  pm.test('Customer created', function() {",
+                  "    pm.expect(json.customer_id).to.be.a('string');",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Customer",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" }
+            ],
+            "url": "{{base_url}}/api/customers/{{customer_id}}"
+          }
+        },
+        {
+          "name": "List Customers",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/customers?offset=0&limit=25",
+              "host": ["{{base_url}}"],
+              "path": ["api", "customers"],
+              "query": [
+                { "key": "offset", "value": "0" },
+                { "key": "limit", "value": "25" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Customer",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Jane\",\n  \"last_name\": \"Smith\"\n}"
+            },
+            "url": "{{base_url}}/api/customers/{{customer_id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cards",
+      "item": [
+        {
+          "name": "List Customer Cards",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" }
+            ],
+            "url": "{{base_url}}/api/customers/{{customer_id}}/cards"
+          }
+        },
+        {
+          "name": "List All Cards",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" }
+            ],
+            "url": "{{base_url}}/api/cards"
+          }
+        },
+        {
+          "name": "Get Card",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" }
+            ],
+            "url": "{{base_url}}/api/cards/{{card_id}}"
+          }
+        },
+        {
+          "name": "Update Card",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"holder_name\": \"Jane Smith\",\n  \"is_active\": true\n}"
+            },
+            "url": "{{base_url}}/api/cards/{{card_id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "Create Payment (Card)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transaction\": {\n    \"order_id\": \"ORD-{{$randomInt}}\",\n    \"amount\": 10.00,\n    \"currency\": \"gbp\",\n    \"capture\": true\n  },\n  \"payment\": {\n    \"card\": {\n      \"holder_name\": \"John Doe\",\n      \"number\": \"4000000000001000\",\n      \"expiry_month\": 12,\n      \"expiry_year\": 2028,\n      \"cvv\": \"123\"\n    },\n    \"create_card\": true\n  },\n  \"customer\": {\n    \"customer_id\": \"{{customer_id}}\"\n  }\n}"
+            },
+            "url": "{{base_url}}/api/payments"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  var json = pm.response.json();",
+                  "  pm.environment.set('transaction_id', json.transaction_id);",
+                  "  if (json.card_id) pm.environment.set('card_id', json.card_id);",
+                  "  pm.test('Payment created', function() {",
+                  "    pm.expect(json.status).to.equal('success');",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Payment (Stored Card)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transaction\": {\n    \"order_id\": \"ORD-{{$randomInt}}\",\n    \"amount\": 25.50,\n    \"currency\": \"gbp\",\n    \"capture\": true\n  },\n  \"payment\": {\n    \"card_id\": \"{{card_id}}\"\n  },\n  \"customer\": {\n    \"customer_id\": \"{{customer_id}}\"\n  }\n}"
+            },
+            "url": "{{base_url}}/api/payments"
+          }
+        },
+        {
+          "name": "Create Payment (Auth Only)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transaction\": {\n    \"order_id\": \"ORD-{{$randomInt}}\",\n    \"amount\": 50.00,\n    \"currency\": \"gbp\",\n    \"capture\": false\n  },\n  \"payment\": {\n    \"card\": {\n      \"holder_name\": \"John Doe\",\n      \"number\": \"4000000000001000\",\n      \"expiry_month\": 12,\n      \"expiry_year\": 2028,\n      \"cvv\": \"123\"\n    }\n  }\n}"
+            },
+            "url": "{{base_url}}/api/payments"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  var json = pm.response.json();",
+                  "  pm.environment.set('auth_transaction_id', json.transaction_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Payment Sessions",
+      "item": [
+        {
+          "name": "Create Payment Session",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": \"ORD-{{$randomInt}}\",\n  \"amount\": 15.00,\n  \"currency\": \"gbp\"\n}"
+            },
+            "url": "{{base_url}}/api/payment-sessions"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payment Links",
+      "item": [
+        {
+          "name": "Create Payment Link",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transaction\": {\n    \"order_id\": \"ORD-{{$randomInt}}\",\n    \"amount\": 99.99,\n    \"currency\": \"gbp\"\n  }\n}"
+            },
+            "url": "{{base_url}}/api/payment-links"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  var json = pm.response.json();",
+                  "  pm.environment.set('link_id', json.link_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Send Payment Link",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"customer@example.com\"\n}"
+            },
+            "url": "{{base_url}}/api/payment-links/{{link_id}}/send"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Transactions",
+      "item": [
+        {
+          "name": "Get Transaction",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" }
+            ],
+            "url": "{{base_url}}/api/transactions/{{transaction_id}}"
+          }
+        },
+        {
+          "name": "List Transactions",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/transactions?offset=0&limit=25",
+              "host": ["{{base_url}}"],
+              "path": ["api", "transactions"],
+              "query": [
+                { "key": "offset", "value": "0" },
+                { "key": "limit", "value": "25" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Capture Transaction",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transaction_id\": \"{{auth_transaction_id}}\",\n  \"amount\": 50.00\n}"
+            },
+            "url": "{{base_url}}/api/transactions/capture"
+          }
+        },
+        {
+          "name": "Refund Transaction",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transaction_id\": \"{{transaction_id}}\",\n  \"amount\": 5.00\n}"
+            },
+            "url": "{{base_url}}/api/transactions/refund"
+          }
+        },
+        {
+          "name": "Void Transaction",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transaction_id\": \"{{transaction_id}}\"\n}"
+            },
+            "url": "{{base_url}}/api/transactions/void"
+          }
+        },
+        {
+          "name": "Reverse Transaction",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transaction_id\": \"{{transaction_id}}\"\n}"
+            },
+            "url": "{{base_url}}/api/transactions/reversal"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Pay by Bank",
+      "item": [
+        {
+          "name": "List Banks (ASPSPs)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" }
+            ],
+            "url": "{{base_url}}/api/pay-by-bank/banks"
+          }
+        },
+        {
+          "name": "Create Single Immediate Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"aspsp_id\": \"{{aspsp_id}}\",\n  \"order_id\": \"ORD-{{$randomInt}}\",\n  \"amount\": 100.00,\n  \"currency\": \"gbp\",\n  \"redirect_url\": \"https://example.com/callback\"\n}"
+            },
+            "url": "{{base_url}}/api/pay-by-bank/single-immediate-payment"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Faster Payments",
+      "item": [
+        {
+          "name": "Create Payee",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"payee_details\": {\n    \"name\": \"John Doe\",\n    \"account_number\": \"12345678\",\n    \"sort_code\": \"123456\",\n    \"country_code\": \"GB\"\n  }\n}"
+            },
+            "url": "{{base_url}}/api/customers/{{customer_id}}/payees"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  var json = pm.response.json();",
+                  "  pm.environment.set('payee_id', json.payee_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Payees",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" }
+            ],
+            "url": "{{base_url}}/api/payees"
+          }
+        },
+        {
+          "name": "Create Payout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"payee_id\": \"{{payee_id}}\",\n  \"amount\": 50.00,\n  \"currency\": \"gbp\",\n  \"reference\": \"PAYOUT-001\"\n}"
+            },
+            "url": "{{base_url}}/api/payouts"
+          }
+        },
+        {
+          "name": "Create Account",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_name\": \"Settlement GBP\",\n  \"currency\": \"gbp\"\n}"
+            },
+            "url": "{{base_url}}/api/accounts"
+          }
+        },
+        {
+          "name": "List Accounts",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" }
+            ],
+            "url": "{{base_url}}/api/accounts"
+          }
+        },
+        {
+          "name": "Create Transfer",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source_mid\": \"{{source_mid}}\",\n  \"destination_mid\": \"{{destination_mid}}\",\n  \"amount\": 25.00,\n  \"currency\": \"gbp\"\n}"
+            },
+            "url": "{{base_url}}/api/transfers"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Direct Debit",
+      "item": [
+        {
+          "name": "Create Mandate",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_id\": \"{{customer_id}}\",\n  \"reference\": \"DD-{{$randomInt}}\",\n  \"redirect_url\": \"https://example.com/mandate-callback\"\n}"
+            },
+            "url": "{{base_url}}/api/mandates"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  var json = pm.response.json();",
+                  "  pm.environment.set('mandate_id', json.mandate_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Mandate",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" }
+            ],
+            "url": "{{base_url}}/api/mandates/{{mandate_id}}"
+          }
+        },
+        {
+          "name": "List Mandates",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" }
+            ],
+            "url": "{{base_url}}/api/mandates"
+          }
+        },
+        {
+          "name": "Cancel Mandate",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" }
+            ],
+            "url": "{{base_url}}/api/mandates/{{mandate_id}}/cancel"
+          }
+        },
+        {
+          "name": "Create Collection",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mandate_id\": \"{{mandate_id}}\",\n  \"amount\": 150.00,\n  \"currency\": \"gbp\",\n  \"reference\": \"COL-001\"\n}"
+            },
+            "url": "{{base_url}}/api/collections"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  var json = pm.response.json();",
+                  "  pm.environment.set('collection_id', json.collection_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Collection",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" }
+            ],
+            "url": "{{base_url}}/api/collections/{{collection_id}}"
+          }
+        },
+        {
+          "name": "Cancel Collection",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" }
+            ],
+            "url": "{{base_url}}/api/collections/{{collection_id}}/cancel"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reports",
+      "item": [
+        {
+          "name": "List Reconciliations",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" }
+            ],
+            "url": "{{base_url}}/api/reports/reconciliations"
+          }
+        },
+        {
+          "name": "Get Reconciliation",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" }
+            ],
+            "url": "{{base_url}}/api/reports/reconciliations/{{reconciliation_id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tools",
+      "item": [
+        {
+          "name": "Confirmation of Payee",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Company-Id", "value": "{{company_id}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Doe\",\n  \"account_number\": \"12345678\",\n  \"sort_code\": \"123456\"\n}"
+            },
+            "url": "{{base_url}}/api/tools/confirmation-of-payee"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/health"
+          }
+        }
+      ]
+    }
+  ]
+}
