@@ -1,37 +1,27 @@
+using Acquired.Models.Reports;
 using Acquired.Services.Reports;
 using Microsoft.AspNetCore.Mvc;
-using System.ComponentModel.DataAnnotations;
 
 namespace Acquired.Api.Controllers;
 
 [ApiController]
-[Route("api/reports")]
+[Route("v1/reports")]
 public class ReportsController : ControllerBase
 {
-    private readonly IReportsService _service;
-
-    public ReportsController(IReportsService service)
-    {
-        _service = service;
-    }
+    private readonly IReportService _service;
+    public ReportsController(IReportService service) => _service = service;
 
     [HttpGet("reconciliations")]
-    public async Task<IActionResult> ListReconciliations(
-        [FromHeader(Name = "X-Company-Id")][Required] string companyId,
-        [FromQuery] Dictionary<string, string?> filters,
-        CancellationToken ct)
+    public async Task<IActionResult> List([FromQuery] ReconQuery query)
     {
-        var result = await _service.ListReconciliationsAsync(filters, ct);
+        var result = await _service.ListReconciliationsAsync<object>(query);
         return Ok(result);
     }
 
-    [HttpGet("reconciliations/{id}")]
-    public async Task<IActionResult> GetReconciliation(
-        [FromHeader(Name = "X-Company-Id")][Required] string companyId,
-        string id,
-        CancellationToken ct)
+    [HttpGet("reconciliations/{reconciliationId}")]
+    public async Task<IActionResult> Get(string reconciliationId)
     {
-        var result = await _service.GetReconciliationAsync(id, ct);
+        var result = await _service.GetReconciliationAsync<object>(reconciliationId);
         return Ok(result);
     }
 }

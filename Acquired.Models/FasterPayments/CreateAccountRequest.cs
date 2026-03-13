@@ -1,15 +1,24 @@
 using Newtonsoft.Json;
-using System.ComponentModel.DataAnnotations;
 
 namespace Acquired.Models.FasterPayments;
 
 public class CreateAccountRequest
 {
     [JsonProperty("account_name")]
-    [Required]
-    public string AccountName { get; set; } = null!;
+    public string AccountName { get; set; } = default!;
 
-    [JsonProperty("currency")]
-    [Required]
-    public string Currency { get; set; } = null!;
+    [JsonProperty("sort_code", NullValueHandling = NullValueHandling.Ignore)]
+    public string? SortCode { get; set; }
+
+    [JsonProperty("account_number", NullValueHandling = NullValueHandling.Ignore)]
+    public string? AccountNumber { get; set; }
+
+    [JsonProperty("currency", NullValueHandling = NullValueHandling.Ignore)]
+    public string? Currency { get; set; }
+
+    [JsonProperty("reference", NullValueHandling = NullValueHandling.Ignore)]
+    public string? Reference { get; set; }
+
+    [JsonProperty("custom_data", NullValueHandling = NullValueHandling.Ignore)]
+    public string? CustomData { get; set; }
 }

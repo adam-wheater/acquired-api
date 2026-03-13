@@ -1,71 +1,42 @@
 using Acquired.Models.Cards;
+using Acquired.Models.Common;
 using Acquired.Services.Cards;
 using Microsoft.AspNetCore.Mvc;
-using System.ComponentModel.DataAnnotations;
 
 namespace Acquired.Api.Controllers;
 
 [ApiController]
-[Route("api/cards")]
+[Route("v1")]
 public class CardsController : ControllerBase
 {
-    private readonly ICardsService _service;
+    private readonly ICardService _service;
+    public CardsController(ICardService service) => _service = service;
 
-    public CardsController(ICardsService service)
+    [HttpGet("customers/{customerId}/cards")]
+    public async Task<IActionResult> GetByCustomer(string customerId, [FromQuery] PaginationQuery query)
     {
-        _service = service;
-    }
-
-    [HttpGet("{cardId}")]
-    public async Task<IActionResult> Get(
-        [FromHeader(Name = "X-Company-Id")][Required] string companyId,
-        string cardId,
-        CancellationToken ct)
-    {
-        var result = await _service.GetAsync(cardId, ct);
+        var result = await _service.GetByCustomerIdAsync(customerId, query);
         return Ok(result);
     }
 
-    [HttpGet]
-    public async Task<IActionResult> List(
-        [FromHeader(Name = "X-Company-Id")][Required] string companyId,
-        [FromQuery] Dictionary<string, string?> filters,
-        CancellationToken ct)
+    [HttpGet("cards")]
+    public async Task<IActionResult> List([FromQuery] PaginationQuery query)
     {
-        var result = await _service.ListAsync(filters, ct);
+        var result = await _service.GetAllAsync(query);
         return Ok(result);
     }
 
-    [HttpPut("{cardId}")]
-    public async Task<IActionResult> Update(
-        [FromHeader(Name = "X-Company-Id")][Required] string companyId,
-        string cardId,
-        [FromBody] UpdateCardRequest request,
-        CancellationToken ct)
+    [HttpGet("cards/{cardId}")]
+    public async Task<IActionResult> Get(string cardId)
     {
-        var result = await _service.UpdateAsync(cardId, request, ct);
+        var result = await _service.GetByIdAsync(cardId);
         return Ok(result);
     }
-}
 
-[ApiController]
-[Route("api/customers/{customerId}/cards")]
-public class CustomerCardsController : ControllerBase
-{
-    private readonly ICardsService _service;
-
-    public CustomerCardsController(ICardsService service)
+    [HttpPut("cards/{cardId}")]
+    public async Task<IActionResult> Update(string cardId, [FromBody] UpdateCardRequest request)
     {
-        _service = service;
-    }
-
-    [HttpGet]
-    public async Task<IActionResult> List(
-        [FromHeader(Name = "X-Company-Id")][Required] string companyId,
-        string customerId,
-        CancellationToken ct)
-    {
-        var result = await _service.ListByCustomerAsync(customerId, ct);
+        var result = await _service.UpdateAsync(cardId, request);
         return Ok(result);
     }
 }

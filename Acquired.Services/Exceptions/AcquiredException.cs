@@ -1,11 +1,28 @@
+using System.Net;
+using Acquired.Models.Common;
+using Newtonsoft.Json;
+
 namespace Acquired.Services.Exceptions;
 
-public abstract class AcquiredException : Exception
+public class AcquiredException : Exception
 {
-    public string? CorrelationId { get; set; }
+    public int StatusCode { get; }
+    public AcquiredErrorResponse? ErrorResponse { get; }
+    public string Content { get; }
 
-    protected AcquiredException(string message) : base(message) { }
+    public AcquiredException(HttpResponseMessage response, string content)
+        : base($"Acquired API error {(int)response.StatusCode}: {content}")
+    {
+        StatusCode = (int)response.StatusCode;
+        Content = content;
 
-    protected AcquiredException(string message, Exception innerException)
-        : base(message, innerException) { }
+        try
+        {
+            ErrorResponse = JsonConvert.DeserializeObject<AcquiredErrorResponse>(content);
+        }
+        catch
+        {
+            ErrorResponse = null;
+        }
+    }
 }

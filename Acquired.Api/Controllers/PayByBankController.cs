@@ -1,37 +1,26 @@
-using Acquired.Models.PayByBank;
 using Acquired.Services.PayByBank;
 using Microsoft.AspNetCore.Mvc;
-using System.ComponentModel.DataAnnotations;
 
 namespace Acquired.Api.Controllers;
 
 [ApiController]
-[Route("api/pay-by-bank")]
+[Route("v1")]
 public class PayByBankController : ControllerBase
 {
     private readonly IPayByBankService _service;
+    public PayByBankController(IPayByBankService service) => _service = service;
 
-    public PayByBankController(IPayByBankService service)
+    [HttpGet("aspsps")]
+    public async Task<IActionResult> GetAspsps()
     {
-        _service = service;
-    }
-
-    [HttpGet("banks")]
-    public async Task<IActionResult> ListBanks(
-        [FromHeader(Name = "X-Company-Id")][Required] string companyId,
-        CancellationToken ct)
-    {
-        var result = await _service.ListBanksAsync(ct);
+        var result = await _service.GetAspspsAsync<object>();
         return Ok(result);
     }
 
     [HttpPost("single-immediate-payment")]
-    public async Task<IActionResult> CreateSingleImmediatePayment(
-        [FromHeader(Name = "X-Company-Id")][Required] string companyId,
-        [FromBody] CreateSingleImmediatePaymentRequest request,
-        CancellationToken ct)
+    public async Task<IActionResult> CreateSingleImmediatePayment([FromBody] object request)
     {
-        var result = await _service.CreateSingleImmediatePaymentAsync(request, ct);
-        return Created(string.Empty, result);
+        var result = await _service.CreateSingleImmediatePaymentAsync<object>(request);
+        return Created("", result);
     }
 }

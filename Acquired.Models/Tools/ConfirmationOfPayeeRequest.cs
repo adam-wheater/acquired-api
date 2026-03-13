@@ -1,21 +1,18 @@
 using Newtonsoft.Json;
-using System.ComponentModel.DataAnnotations;
 
 namespace Acquired.Models.Tools;
 
 public class ConfirmationOfPayeeRequest
 {
-    [JsonProperty("name")]
-    [Required]
-    public string Name { get; set; } = null!;
-
-    [JsonProperty("account_number")]
-    [Required]
-    [StringLength(8)]
-    public string AccountNumber { get; set; } = null!;
+    [JsonProperty("account_name")]
+    public string AccountName { get; set; } = default!;
 
     [JsonProperty("sort_code")]
-    [Required]
-    [StringLength(6)]
-    public string SortCode { get; set; } = null!;
+    public string SortCode { get; set; } = default!;
+
+    [JsonProperty("account_number")]
+    public string AccountNumber { get; set; } = default!;
+
+    [JsonProperty("account_type")]
+    public string AccountType { get; set; } = default!;
 }

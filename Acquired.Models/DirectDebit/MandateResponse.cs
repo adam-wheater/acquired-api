@@ -10,15 +10,21 @@ public class MandateResponse
     [JsonProperty("customer_id")]
     public string? CustomerId { get; set; }
 
-    [JsonProperty("reference")]
-    public string? Reference { get; set; }
+    [JsonProperty("mandate_reference")]
+    public string? MandateReference { get; set; }
+
+    [JsonProperty("scheme")]
+    public string? Scheme { get; set; }
 
     [JsonProperty("status")]
     public string? Status { get; set; }
 
-    [JsonProperty("redirect_url")]
-    public string? RedirectUrl { get; set; }
+    [JsonProperty("bank_account", NullValueHandling = NullValueHandling.Ignore)]
+    public BankAccountDetails? BankAccount { get; set; }
 
     [JsonProperty("created")]
     public string? Created { get; set; }
+
+    [JsonProperty("last_updated")]
+    public string? LastUpdated { get; set; }
 }

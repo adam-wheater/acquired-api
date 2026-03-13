@@ -1,33 +1,68 @@
-using Acquired.Models.Payments;
 using Acquired.Services.Payments;
 using Microsoft.AspNetCore.Mvc;
-using System.ComponentModel.DataAnnotations;
 
 namespace Acquired.Api.Controllers;
 
 [ApiController]
-[Route("api/payments")]
+[Route("v1/payments")]
 public class PaymentsController : ControllerBase
 {
-    private readonly IPaymentsService _service;
-
-    public PaymentsController(IPaymentsService service)
-    {
-        _service = service;
-    }
+    private readonly IPaymentService _service;
+    public PaymentsController(IPaymentService service) => _service = service;
 
     [HttpPost]
-    public async Task<IActionResult> Create(
-        [FromHeader(Name = "X-Company-Id")][Required] string companyId,
-        [FromBody] CreatePaymentRequest request,
-        CancellationToken ct)
+    public async Task<IActionResult> Create([FromBody] object request)
     {
-        var result = await _service.CreateAsync(request, ct);
+        var result = await _service.CreatePaymentAsync<object>(request);
+        return Created("", result);
+    }
 
-        return result.Status switch
-        {
-            "tds_pending" => Accepted(result),
-            _ => Created($"api/transactions/{result.TransactionId}", result)
-        };
+    [HttpPost("reuse")]
+    public async Task<IActionResult> CreateReuse([FromBody] object request)
+    {
+        var result = await _service.CreateReusePaymentAsync<object>(request);
+        return Created("", result);
+    }
+
+    [HttpPost("apple-pay")]
+    public async Task<IActionResult> CreateApplePay([FromBody] object request)
+    {
+        var result = await _service.CreateApplePayAsync<object>(request);
+        return Created("", result);
+    }
+
+    [HttpPost("google-pay")]
+    public async Task<IActionResult> CreateGooglePay([FromBody] object request)
+    {
+        var result = await _service.CreateGooglePayAsync<object>(request);
+        return Created("", result);
+    }
+
+    [HttpPost("recurring")]
+    public async Task<IActionResult> CreateRecurring([FromBody] object request)
+    {
+        var result = await _service.CreateRecurringAsync<object>(request);
+        return Created("", result);
+    }
+
+    [HttpPost("credit")]
+    public async Task<IActionResult> CreateCredit([FromBody] object request)
+    {
+        var result = await _service.CreateCreditAsync<object>(request);
+        return Created("", result);
+    }
+
+    [HttpPost("internal-transfer")]
+    public async Task<IActionResult> CreateInternalTransfer([FromBody] object request)
+    {
+        var result = await _service.CreateInternalTransferAsync<object>(request);
+        return Created("", result);
+    }
+
+    [HttpPost("collections")]
+    public async Task<IActionResult> CreateCollection([FromBody] object request)
+    {
+        var result = await _service.CreateCollectionAsync<object>(request);
+        return Created("", result);
     }
 }

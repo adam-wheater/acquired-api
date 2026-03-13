@@ -5,6 +5,7 @@ using Acquired.Services.Customers;
 using Acquired.Services.DirectDebit;
 using Acquired.Services.FasterPayments;
 using Acquired.Services.Http;
+using Acquired.Services.OpenBanking;
 using Acquired.Services.PayByBank;
 using Acquired.Services.PaymentLinks;
 using Acquired.Services.Payments;
@@ -17,72 +18,64 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Polly;
 using Polly.Contrib.WaitAndRetry;
-using Polly.Extensions.Http;
 
 namespace Acquired.Services.DependencyInjection;
 
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddAcquiredServices(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddAcquiredServices(
+        this IServiceCollection services,
+        IConfiguration configuration)
     {
-        // Configuration
-        services.Configure<AcquiredOptions>(configuration.GetSection(AcquiredOptions.SectionName));
+        // 1. Bind configuration
+        services.Configure<AcquiredOptions>(
+            configuration.GetSection(AcquiredOptions.SectionName));
 
-        // Singletons
-        services.AddSingleton<IAcquiredTokenService, AcquiredTokenService>();
-        services.AddHttpContextAccessor();
+        // 2. Register TokenService as Singleton
+        services.AddSingleton<ITokenService, TokenService>();
 
-        // HTTP client with Polly
-        services.AddHttpClient("Acquired", (sp, client) =>
-        {
-            var options = sp.GetRequiredService<IOptions<AcquiredOptions>>().Value;
-            client.BaseAddress = new Uri(options.BaseUrl);
-            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
-            client.DefaultRequestHeaders.Add("Accept", "application/json");
-        })
-        .AddPolicyHandler(GetRetryPolicy())
-        .AddPolicyHandler(GetCircuitBreakerPolicy());
-
-        // Scoped HTTP client wrapper
+        // 3. Register AcquiredHttpClient as Scoped
         services.AddScoped<IAcquiredHttpClient, AcquiredHttpClient>();
 
-        // Business services
-        services.AddScoped<ICustomersService, CustomersService>();
-        services.AddScoped<ICardsService, CardsService>();
-        services.AddScoped<IPaymentsService, PaymentsService>();
-        services.AddScoped<IPaymentSessionsService, PaymentSessionsService>();
-        services.AddScoped<IPaymentLinksService, PaymentLinksService>();
-        services.AddScoped<ITransactionsService, TransactionsService>();
+        // 4. Named HttpClient for auth (no retry policies)
+        services.AddHttpClient("AcquiredAuth", (sp, client) =>
+        {
+            var opts = sp.GetRequiredService<IOptions<AcquiredOptions>>().Value;
+            client.BaseAddress = new Uri(opts.BaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(opts.TimeoutSeconds);
+        });
+
+        // 5. Named HttpClient for API with Polly resilience policies
+        var delay = Backoff.DecorrelatedJitterBackoffV2(
+            medianFirstRetryDelay: TimeSpan.FromSeconds(1),
+            retryCount: 3);
+
+        services.AddHttpClient("AcquiredApi", (sp, client) =>
+        {
+            var opts = sp.GetRequiredService<IOptions<AcquiredOptions>>().Value;
+            client.BaseAddress = new Uri(opts.BaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(opts.TimeoutSeconds);
+        })
+        .AddTransientHttpErrorPolicy(p => p.WaitAndRetryAsync(delay))
+        .AddTransientHttpErrorPolicy(p => p.CircuitBreakerAsync(5, TimeSpan.FromSeconds(30)));
+
+        // 6. Register all business services as Scoped
+        services.AddScoped<ICustomerService, CustomerService>();
+        services.AddScoped<ICardService, CardService>();
+        services.AddScoped<IPaymentService, PaymentService>();
+        services.AddScoped<IPaymentSessionService, PaymentSessionService>();
+        services.AddScoped<IPaymentLinkService, PaymentLinkService>();
+        services.AddScoped<ITransactionService, TransactionService>();
         services.AddScoped<IPayByBankService, PayByBankService>();
-        services.AddScoped<IPayeesService, PayeesService>();
-        services.AddScoped<IPayoutsService, PayoutsService>();
-        services.AddScoped<IAccountsService, AccountsService>();
-        services.AddScoped<ITransfersService, TransfersService>();
-        services.AddScoped<IMandatesService, MandatesService>();
-        services.AddScoped<ICollectionsService, CollectionsService>();
-        services.AddScoped<IReportsService, ReportsService>();
-        services.AddScoped<IToolsService, ToolsService>();
+        services.AddScoped<IFasterPaymentService, FasterPaymentService>();
+        services.AddScoped<IDirectDebitService, DirectDebitService>();
+        services.AddScoped<IOpenBankingService, OpenBankingService>();
+        services.AddScoped<IReportService, ReportService>();
+        services.AddScoped<IToolService, ToolService>();
+
+        // 7. Register IHttpContextAccessor
+        services.AddHttpContextAccessor();
 
         return services;
-    }
-
-    private static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy()
-    {
-        var delay = Backoff.DecorrelatedJitterBackoffV2(
-            medianFirstRetryDelay: TimeSpan.FromSeconds(1), retryCount: 3);
-
-        return HttpPolicyExtensions
-            .HandleTransientHttpError()
-            .OrResult(msg => msg.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
-            .WaitAndRetryAsync(delay);
-    }
-
-    private static IAsyncPolicy<HttpResponseMessage> GetCircuitBreakerPolicy()
-    {
-        return HttpPolicyExtensions
-            .HandleTransientHttpError()
-            .CircuitBreakerAsync(
-                handledEventsAllowedBeforeBreaking: 5,
-                durationOfBreak: TimeSpan.FromSeconds(30));
     }
 }

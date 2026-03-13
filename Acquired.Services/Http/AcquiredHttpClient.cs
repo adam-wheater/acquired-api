@@ -1,204 +1,154 @@
+using System.Net.Http.Headers;
+using System.Text;
 using Acquired.Services.Auth;
-using Acquired.Services.Configuration;
 using Acquired.Services.Exceptions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using System.Text;
-using System.Web;
 
 namespace Acquired.Services.Http;
 
 public class AcquiredHttpClient : IAcquiredHttpClient
 {
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly IAcquiredTokenService _tokenService;
-    private readonly AcquiredOptions _options;
+    private readonly HttpClient _httpClient;
+    private readonly ITokenService _tokenService;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ILogger<AcquiredHttpClient> _logger;
 
+    private static readonly Dictionary<string, string> PropagatedHeaders = new()
+    {
+        ["Company-Id"] = "Company-Id",
+        ["Mid"] = "Mid",
+        ["CorrelationId"] = "X-Correlation-Id"
+    };
+
     public AcquiredHttpClient(
         IHttpClientFactory httpClientFactory,
-        IAcquiredTokenService tokenService,
-        IOptions<AcquiredOptions> options,
+        ITokenService tokenService,
         IHttpContextAccessor httpContextAccessor,
         ILogger<AcquiredHttpClient> logger)
     {
-        _httpClientFactory = httpClientFactory;
+        _httpClient = httpClientFactory.CreateClient("AcquiredApi");
         _tokenService = tokenService;
-        _options = options.Value;
         _httpContextAccessor = httpContextAccessor;
         _logger = logger;
     }
 
-    public async Task<TResponse> SendAsync<TResponse>(HttpMethod method, string path, object? body, CancellationToken ct = default)
+    public async Task<T> GetAsync<T>(string path, Dictionary<string, string>? queryParams = null)
     {
-        var request = await CreateRequest(method, path, ct);
-
-        if (body is not null)
-        {
-            var json = JsonConvert.SerializeObject(body, new JsonSerializerSettings
-            {
-                NullValueHandling = NullValueHandling.Ignore
-            });
-            request.Content = new StringContent(json, Encoding.UTF8, "application/json");
-        }
-
-        return await ExecuteAsync<TResponse>(request, ct);
+        var url = BuildUrl(path, queryParams);
+        var request = new HttpRequestMessage(HttpMethod.Get, url);
+        return await SendAsync<T>(request);
     }
 
-    public async Task<TResponse> GetAsync<TResponse>(string path, Dictionary<string, string?>? queryParams = null, CancellationToken ct = default)
+    public async Task<T> PostAsync<T>(string path, object? body = null)
     {
-        var fullPath = BuildQueryString(path, queryParams);
-        var request = await CreateRequest(HttpMethod.Get, fullPath, ct);
-        return await ExecuteAsync<TResponse>(request, ct);
-    }
-
-    public async Task SendWithoutResponseAsync(HttpMethod method, string path, object? body, CancellationToken ct = default)
-    {
-        var request = await CreateRequest(method, path, ct);
-
+        var request = new HttpRequestMessage(HttpMethod.Post, path);
         if (body is not null)
         {
-            var json = JsonConvert.SerializeObject(body, new JsonSerializerSettings
-            {
-                NullValueHandling = NullValueHandling.Ignore
-            });
-            request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+            request.Content = Serialize(body);
         }
+        return await SendAsync<T>(request);
+    }
 
-        var client = _httpClientFactory.CreateClient("Acquired");
-        var response = await client.SendAsync(request, ct);
-        var responseBody = await response.Content.ReadAsStringAsync(ct);
+    public async Task<T> PutAsync<T>(string path, object body)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Put, path);
+        request.Content = Serialize(body);
+        return await SendAsync<T>(request);
+    }
+
+    public async Task<T> DeleteAsync<T>(string path)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Delete, path);
+        return await SendAsync<T>(request);
+    }
+
+    public async Task PostAsync(string path, object? body = null)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, path);
+        if (body is not null)
+        {
+            request.Content = Serialize(body);
+        }
+        await SendAsync(request);
+    }
+
+    private async Task<T> SendAsync<T>(HttpRequestMessage request)
+    {
+        await PrepareRequest(request);
+
+        _logger.LogDebug("Sending {Method} {Uri}", request.Method, request.RequestUri);
+
+        var response = await _httpClient.SendAsync(request);
+        var content = await response.Content.ReadAsStringAsync();
 
         if (!response.IsSuccessStatusCode)
         {
-            HandleErrorResponse((int)response.StatusCode, responseBody);
-        }
-    }
-
-    private async Task<HttpRequestMessage> CreateRequest(HttpMethod method, string path, CancellationToken ct)
-    {
-        var token = await _tokenService.GetTokenAsync(ct);
-        var request = new HttpRequestMessage(method, path);
-
-        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-
-        var context = _httpContextAccessor.HttpContext;
-        if (context is not null)
-        {
-            if (context.Items.TryGetValue("CompanyId", out var companyId) && companyId is string cid)
-            {
-                request.Headers.Add("Company-Id", cid);
-            }
-
-            if (context.Items.TryGetValue("Mid", out var mid) && mid is string midValue && !string.IsNullOrEmpty(midValue))
-            {
-                request.Headers.Add("Mid", midValue);
-            }
-
-            if (context.Items.TryGetValue("CorrelationId", out var correlationId) && correlationId is string corrId)
-            {
-                request.Headers.Add("X-Correlation-Id", corrId);
-            }
+            _logger.LogWarning("Acquired API error {StatusCode} for {Method} {Uri}: {Content}",
+                (int)response.StatusCode, request.Method, request.RequestUri, content);
+            throw new AcquiredException(response, content);
         }
 
-        return request;
+        return JsonConvert.DeserializeObject<T>(content)!;
     }
 
-    private async Task<TResponse> ExecuteAsync<TResponse>(HttpRequestMessage request, CancellationToken ct)
+    private async Task SendAsync(HttpRequestMessage request)
     {
-        var client = _httpClientFactory.CreateClient("Acquired");
+        await PrepareRequest(request);
 
-        _logger.LogDebug("Sending {Method} {Path}", request.Method, request.RequestUri);
+        _logger.LogDebug("Sending {Method} {Uri}", request.Method, request.RequestUri);
 
-        var response = await client.SendAsync(request, ct);
-        var responseBody = await response.Content.ReadAsStringAsync(ct);
+        var response = await _httpClient.SendAsync(request);
 
         if (!response.IsSuccessStatusCode)
         {
-            HandleErrorResponse((int)response.StatusCode, responseBody);
+            var content = await response.Content.ReadAsStringAsync();
+            _logger.LogWarning("Acquired API error {StatusCode} for {Method} {Uri}: {Content}",
+                (int)response.StatusCode, request.Method, request.RequestUri, content);
+            throw new AcquiredException(response, content);
         }
-
-        // Check for declined payment status
-        InspectPaymentStatus(responseBody);
-
-        var result = JsonConvert.DeserializeObject<TResponse>(responseBody);
-        return result ?? throw new InvalidOperationException(
-            $"Failed to deserialize response to {typeof(TResponse).Name}");
     }
 
-    private void InspectPaymentStatus(string responseBody)
+    private async Task PrepareRequest(HttpRequestMessage request)
     {
-        try
-        {
-            var json = JObject.Parse(responseBody);
-            var status = json.SelectToken("status")?.Value<string>();
+        var token = await _tokenService.GetTokenAsync();
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            if (status is "declined" or "blocked")
+        PropagateHeaders(request);
+    }
+
+    private void PropagateHeaders(HttpRequestMessage request)
+    {
+        var httpContext = _httpContextAccessor.HttpContext;
+        if (httpContext is null) return;
+
+        foreach (var (itemKey, headerName) in PropagatedHeaders)
+        {
+            if (httpContext.Items.TryGetValue(itemKey, out var value) && value is string strValue)
             {
-                var transactionId = json.SelectToken("transaction_id")?.Value<string>();
-                throw new AcquiredDeclinedException($"Payment {status}")
-                {
-                    Status = status,
-                    TransactionId = transactionId,
-                    DeclineReason = status
-                };
+                request.Headers.TryAddWithoutValidation(headerName, strValue);
             }
         }
-        catch (JsonReaderException)
-        {
-            // Not JSON, ignore
-        }
-        catch (AcquiredDeclinedException)
-        {
-            throw;
-        }
     }
 
-    private void HandleErrorResponse(int statusCode, string responseBody)
-    {
-        _logger.LogWarning("Acquired.com API error: {StatusCode} {Body}", statusCode, responseBody);
-
-        string? errorType = null;
-        string? title = null;
-        string? instance = null;
-
-        try
-        {
-            var json = JObject.Parse(responseBody);
-            errorType = json.SelectToken("error_type")?.Value<string>();
-            title = json.SelectToken("title")?.Value<string>();
-            instance = json.SelectToken("instance")?.Value<string>();
-        }
-        catch (JsonReaderException)
-        {
-            // Not JSON
-        }
-
-        throw new AcquiredApiException(title ?? $"Acquired.com API returned {statusCode}")
-        {
-            AcquiredHttpStatusCode = statusCode,
-            ErrorType = errorType,
-            Title = title,
-            Instance = instance
-        };
-    }
-
-    private static string BuildQueryString(string path, Dictionary<string, string?>? queryParams)
+    private static string BuildUrl(string path, Dictionary<string, string>? queryParams)
     {
         if (queryParams is null || queryParams.Count == 0)
-            return path;
-
-        var query = HttpUtility.ParseQueryString(string.Empty);
-        foreach (var (key, value) in queryParams)
         {
-            if (value is not null)
-                query[key] = value;
+            return path;
         }
 
-        return $"{path}?{query}";
+        var queryParts = queryParams
+            .Where(kvp => kvp.Value is not null)
+            .Select(kvp => $"{Uri.EscapeDataString(kvp.Key)}={Uri.EscapeDataString(kvp.Value)}");
+
+        return $"{path}?{string.Join("&", queryParts)}";
+    }
+
+    private static StringContent Serialize(object body)
+    {
+        var json = JsonConvert.SerializeObject(body);
+        return new StringContent(json, Encoding.UTF8, "application/json");
     }
 }

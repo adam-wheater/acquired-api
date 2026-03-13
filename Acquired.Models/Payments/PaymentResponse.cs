@@ -1,5 +1,5 @@
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+using Acquired.Models.Common;
 
 namespace Acquired.Models.Payments;
 
@@ -8,33 +8,12 @@ public class PaymentResponse
     [JsonProperty("transaction_id")]
     public string? TransactionId { get; set; }
 
-    [JsonProperty("order_id")]
-    public string? OrderId { get; set; }
-
     [JsonProperty("status")]
     public string? Status { get; set; }
 
-    [JsonProperty("amount")]
-    public decimal? Amount { get; set; }
+    [JsonProperty("issuer_response_code", NullValueHandling = NullValueHandling.Ignore)]
+    public string? IssuerResponseCode { get; set; }
 
-    [JsonProperty("currency")]
-    public string? Currency { get; set; }
-
-    [JsonProperty("authorization_code")]
-    public string? AuthorizationCode { get; set; }
-
-    [JsonProperty("mid")]
-    public string? Mid { get; set; }
-
-    [JsonProperty("card_id")]
-    public string? CardId { get; set; }
-
-    [JsonProperty("customer_id")]
-    public string? CustomerId { get; set; }
-
-    [JsonProperty("tds")]
-    public JObject? Tds { get; set; }
-
-    [JsonProperty("created")]
-    public string? Created { get; set; }
+    [JsonProperty("links", NullValueHandling = NullValueHandling.Ignore)]
+    public List<LinkModel>? Links { get; set; }
 }

@@ -1,29 +1,23 @@
-using Acquired.Models.Common;
-using Acquired.Models.PayByBank;
 using Acquired.Services.Http;
-using Microsoft.Extensions.Logging;
 
 namespace Acquired.Services.PayByBank;
 
 public class PayByBankService : IPayByBankService
 {
-    private readonly IAcquiredHttpClient _client;
-    private readonly ILogger<PayByBankService> _logger;
+    private readonly IAcquiredHttpClient _httpClient;
 
-    public PayByBankService(IAcquiredHttpClient client, ILogger<PayByBankService> logger)
+    public PayByBankService(IAcquiredHttpClient httpClient)
     {
-        _client = client;
-        _logger = logger;
+        _httpClient = httpClient;
     }
 
-    public async Task<AcquiredListResponse<AspspResponse>> ListBanksAsync(CancellationToken ct = default)
+    public async Task<T> GetAspspsAsync<T>()
     {
-        return await _client.GetAsync<AcquiredListResponse<AspspResponse>>("/v1/aspsps", ct: ct);
+        return await _httpClient.GetAsync<T>("/v1/aspsps");
     }
 
-    public async Task<SingleImmediatePaymentResponse> CreateSingleImmediatePaymentAsync(CreateSingleImmediatePaymentRequest request, CancellationToken ct = default)
+    public async Task<T> CreateSingleImmediatePaymentAsync<T>(object request)
     {
-        _logger.LogInformation("Creating single immediate payment for order {OrderId}", request.OrderId);
-        return await _client.SendAsync<SingleImmediatePaymentResponse>(HttpMethod.Post, "/v1/single-immediate-payment", request, ct);
+        return await _httpClient.PostAsync<T>("/v1/single-immediate-payment", request);
     }
 }

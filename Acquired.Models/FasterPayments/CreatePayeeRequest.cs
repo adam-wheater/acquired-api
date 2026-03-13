@@ -1,31 +1,24 @@
 using Newtonsoft.Json;
-using System.ComponentModel.DataAnnotations;
 
 namespace Acquired.Models.FasterPayments;
 
 public class CreatePayeeRequest
 {
-    [JsonProperty("payee_details")]
-    [Required]
-    public PayeeDetails PayeeDetails { get; set; } = null!;
-}
-
-public class PayeeDetails
-{
-    [JsonProperty("name")]
-    [Required]
-    public string Name { get; set; } = null!;
-
-    [JsonProperty("account_number")]
-    [Required]
-    [StringLength(8)]
-    public string AccountNumber { get; set; } = null!;
+    [JsonProperty("account_name")]
+    public string AccountName { get; set; } = default!;
 
     [JsonProperty("sort_code")]
-    [Required]
-    [StringLength(6)]
-    public string SortCode { get; set; } = null!;
+    public string SortCode { get; set; } = default!;
 
-    [JsonProperty("country_code")]
-    public string? CountryCode { get; set; }
+    [JsonProperty("account_number")]
+    public string AccountNumber { get; set; } = default!;
+
+    [JsonProperty("reference", NullValueHandling = NullValueHandling.Ignore)]
+    public string? Reference { get; set; }
+
+    [JsonProperty("email", NullValueHandling = NullValueHandling.Ignore)]
+    public string? Email { get; set; }
+
+    [JsonProperty("custom_data", NullValueHandling = NullValueHandling.Ignore)]
+    public string? CustomData { get; set; }
 }

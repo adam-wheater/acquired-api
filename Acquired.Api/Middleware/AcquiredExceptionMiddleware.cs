@@ -1,6 +1,5 @@
-using Acquired.Api.Models;
+using Acquired.Models.Common;
 using Acquired.Services.Exceptions;
-using Microsoft.AspNetCore.Http;
 using Newtonsoft.Json;
 
 namespace Acquired.Api.Middleware;
@@ -18,84 +17,51 @@ public class AcquiredExceptionMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        var correlationId = context.Request.Headers["X-Correlation-Id"].FirstOrDefault()
-            ?? Guid.NewGuid().ToString();
+        // Extract headers and store in HttpContext.Items for propagation
+        if (context.Request.Headers.TryGetValue("Company-Id", out var companyId))
+            context.Items["Company-Id"] = companyId.ToString();
+
+        if (context.Request.Headers.TryGetValue("Mid", out var mid))
+            context.Items["Mid"] = mid.ToString();
+
+        var correlationId = context.Request.Headers.TryGetValue("X-Correlation-Id", out var existingCorrelation)
+            ? existingCorrelation.ToString()
+            : Guid.NewGuid().ToString();
         context.Items["CorrelationId"] = correlationId;
-
-        // Extract Company-Id and Mid headers for downstream propagation
-        var companyId = context.Request.Headers["X-Company-Id"].FirstOrDefault();
-        if (!string.IsNullOrEmpty(companyId))
-            context.Items["CompanyId"] = companyId;
-
-        var mid = context.Request.Headers["X-Mid"].FirstOrDefault();
-        if (!string.IsNullOrEmpty(mid))
-            context.Items["Mid"] = mid;
+        context.Response.Headers["X-Correlation-Id"] = correlationId;
 
         try
         {
             await _next(context);
         }
-        catch (AcquiredApiException ex)
+        catch (AcquiredException ex)
         {
-            var statusCode = MapAcquiredHttpStatus(ex.AcquiredHttpStatusCode);
-            _logger.LogWarning(ex, "Acquired API error: {StatusCode} {ErrorType} {Title}",
-                ex.AcquiredHttpStatusCode, ex.ErrorType, ex.Title);
+            _logger.LogWarning(ex, "Acquired API error {StatusCode}", ex.StatusCode);
+            context.Response.StatusCode = ex.StatusCode;
+            context.Response.ContentType = "application/json";
 
-            await WriteErrorResponse(context, statusCode, new AcquiredErrorResponse
-            {
-                StatusCode = statusCode,
-                ErrorCode = ex.ErrorType,
-                Message = ex.Title,
-                AcquiredErrorType = ex.ErrorType,
-                CorrelationId = correlationId
-            });
-        }
-        catch (AcquiredDeclinedException ex)
-        {
-            _logger.LogWarning(ex, "Payment declined: {Status} {Reason}", ex.Status, ex.DeclineReason);
+            var body = ex.ErrorResponse is not null
+                ? JsonConvert.SerializeObject(ex.ErrorResponse, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore })
+                : ex.Content;
 
-            await WriteErrorResponse(context, 422, new AcquiredErrorResponse
-            {
-                StatusCode = 422,
-                ErrorCode = "PAYMENT_DECLINED",
-                Message = ex.Message,
-                AcquiredErrorType = ex.Status,
-                CorrelationId = correlationId
-            });
+            await context.Response.WriteAsync(body);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unhandled exception");
+            context.Response.StatusCode = 500;
+            context.Response.ContentType = "application/json";
 
-            await WriteErrorResponse(context, 500, new AcquiredErrorResponse
+            var error = new AcquiredErrorResponse
             {
-                StatusCode = 500,
-                ErrorCode = "INTERNAL_ERROR",
-                Message = "An unexpected error occurred",
-                CorrelationId = correlationId
-            });
+                Status = "error",
+                ErrorType = "internal_server_error",
+                Title = "An unexpected error occurred.",
+                Instance = context.Request.Path
+            };
+
+            var json = JsonConvert.SerializeObject(error, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
+            await context.Response.WriteAsync(json);
         }
-    }
-
-    private static int MapAcquiredHttpStatus(int acquiredStatus) => acquiredStatus switch
-    {
-        400 => 400,
-        401 or 403 => 502,
-        404 => 404,
-        409 => 409,
-        429 => 429,
-        _ when acquiredStatus >= 500 => 502,
-        _ => 502
-    };
-
-    private static async Task WriteErrorResponse(HttpContext context, int statusCode, AcquiredErrorResponse error)
-    {
-        context.Response.StatusCode = statusCode;
-        context.Response.ContentType = "application/json";
-        var json = JsonConvert.SerializeObject(error, new JsonSerializerSettings
-        {
-            NullValueHandling = NullValueHandling.Ignore
-        });
-        await context.Response.WriteAsync(json);
     }
 }

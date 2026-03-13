@@ -1,17 +1,15 @@
 using Newtonsoft.Json;
-using System.ComponentModel.DataAnnotations;
 
 namespace Acquired.Models.Transactions;
 
 public class RefundRequest
 {
-    [JsonProperty("transaction_id")]
-    [Required]
-    public string TransactionId { get; set; } = null!;
-
     [JsonProperty("amount")]
-    public decimal? Amount { get; set; }
+    public decimal Amount { get; set; }
 
-    [JsonProperty("reference")]
-    public string? Reference { get; set; }
+    [JsonProperty("reason", NullValueHandling = NullValueHandling.Ignore)]
+    public string? Reason { get; set; }
+
+    [JsonProperty("metadata", NullValueHandling = NullValueHandling.Ignore)]
+    public Dictionary<string, string>? Metadata { get; set; }
 }
